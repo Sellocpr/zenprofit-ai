@@ -15,7 +15,8 @@ import {
   Zap,
   Globe,
   Download,
-  Languages
+  Languages,
+  LogOut
 } from 'lucide-react';
 import {
   AreaChart,
@@ -28,6 +29,8 @@ import {
 } from 'recharts';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
+import { useAuth } from './AuthContext';
+import Login from './Login';
 
 const data = [
   { name: 'Lun', earnings: 400 },
@@ -141,6 +144,7 @@ const LanguageSelector = ({ currentLanguage, onChange }) => {
 
 function App() {
   const { t, i18n } = useTranslation();
+  const { currentUser, logout } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showInstallGuide, setShowInstallGuide] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -153,6 +157,11 @@ function App() {
   const changeLanguage = (lng) => {
     i18n.changeLanguage(lng);
   };
+
+  // Si no hay usuario, mostrar el Login
+  if (!currentUser) {
+    return <Login />;
+  }
 
   return (
     <div className={`flex min-h-screen bg-[#020617] text-slate-200 flex-col md:flex-row ${i18n.language === 'ar' ? 'font-arabic' : ''}`}>
@@ -252,12 +261,12 @@ function App() {
             </button>
           </div>
 
-          <button className="flex items-center justify-center gap-2 w-full py-3 rounded-xl border border-white/5 hover:bg-white/5 transition-all group">
-            <Download className="w-4 h-4 text-indigo-400 group-hover:scale-110 transition-transform" />
-            <div className="text-left">
-              <p className="text-[10px] font-bold text-white leading-none">{t('download_desktop')}</p>
-              <p className="text-[8px] text-slate-500 mt-0.5">{t('win_mac_linux')}</p>
-            </div>
+          <button
+            onClick={logout}
+            className="flex items-center justify-center gap-2 w-full py-3 rounded-xl border border-rose-500/20 bg-rose-500/5 hover:bg-rose-500/10 transition-all group"
+          >
+            <LogOut className="w-4 h-4 text-rose-400 group-hover:scale-110 transition-transform" />
+            <span className="text-xs font-bold text-white uppercase tracking-wider">Cerrar Sesión</span>
           </button>
         </div>
       </aside>
@@ -266,7 +275,9 @@ function App() {
       <main className="flex-1 p-4 md:p-8 overflow-y-auto">
         <header className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-10">
           <div>
-            <h2 className="text-2xl md:text-3xl font-bold text-white tracking-tight">{t('welcome')}</h2>
+            <h2 className="text-2xl md:text-3xl font-bold text-white tracking-tight">
+              {t('welcome').replace('Alex', currentUser.displayName || currentUser.email.split('@')[0])}
+            </h2>
             <p className="text-slate-400 mt-1 text-sm md:text-base">{t('growth')}</p>
           </div>
           <div className="flex items-center gap-2 md:gap-4 overflow-x-auto pb-2 md:pb-0">
@@ -285,7 +296,7 @@ function App() {
               <Bell className="w-5 h-5" />
             </button>
             <div className="w-10 h-10 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center overflow-hidden shrink-0">
-              <img src="https://ui-avatars.com/api/?name=Alex+Profit&background=6366f1&color=fff" alt="Avatar" />
+              <img src={currentUser.photoURL || `https://ui-avatars.com/api/?name=${currentUser.email}&background=6366f1&color=fff`} alt="Avatar" />
             </div>
           </div>
         </header>
@@ -377,7 +388,7 @@ function App() {
 
             <div className="mt-6 pt-6 border-t border-white/5">
               <p className="text-[10px] text-slate-500 leading-tight uppercase font-bold tracking-widest text-center">
-                ZenProfit IA v1.1 • Global Independence
+                ZenProfit IA v1.2 • Backend Integrated
               </p>
             </div>
           </div>
