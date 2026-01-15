@@ -26,14 +26,17 @@ export default function Login() {
             }
         } catch (err) {
             console.error("Auth Error:", err);
-            if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+            const code = err.code || 'unknown';
+            if (code === 'auth/user-not-found' || code === 'auth/wrong-password' || code === 'auth/invalid-credential') {
                 setError('Email o contraseña incorrectos.');
-            } else if (err.code === 'auth/email-already-in-use') {
+            } else if (code === 'auth/email-already-in-use') {
                 setError('Este email ya está registrado.');
-            } else if (err.code === 'auth/weak-password') {
+            } else if (code === 'auth/weak-password') {
                 setError('La contraseña debe tener al menos 6 caracteres.');
+            } else if (code === 'auth/operation-not-allowed') {
+                setError('Error (auth/operation-not-allowed): Habilita el método Email/Password en Firebase Console (Authentication > Sign-in method).');
             } else {
-                setError(t('auth_error') || 'Error al conectar. Verifica tus datos.');
+                setError(`Error (${code}): ${err.message || 'Verifica tus datos.'}`);
             }
         } finally {
             setLoading(false);
@@ -47,7 +50,12 @@ export default function Login() {
             await loginWithGoogle();
         } catch (err) {
             console.error("Google Auth Error:", err);
-            setError('Error de Google: ¿Añadiste el dominio en Firebase > Auth > Settings > Authorized domains?');
+            const code = err.code || 'unknown';
+            if (code === 'auth/operation-not-allowed') {
+                setError('Error (auth/operation-not-allowed): Habilita el método Google en Firebase Console (Authentication > Sign-in method).');
+            } else {
+                setError(`Error de Google (${code}): Verifica la configuración y dominios autorizados.`);
+            }
         } finally {
             setLoading(false);
         }
