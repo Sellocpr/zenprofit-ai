@@ -30,7 +30,15 @@ const resources = {
             safetywing_desc: "Global health insurance",
             nordvpn_desc: "Data protection",
             download_desktop: "Download for Desktop",
-            win_mac_linux: "Windows, Mac & Linux"
+            win_mac_linux: "Windows, Mac & Linux",
+            auth_error: "Authentication error. Check your credentials.",
+            login_title: "Access your financial freedom",
+            signup_title: "Create your investor account",
+            or_continue: "or continue with",
+            no_account: "Don't have an account?",
+            have_account: "Already a user?",
+            register: "Register",
+            login_btn: "Login"
         }
     },
     es: {
@@ -60,7 +68,15 @@ const resources = {
             safetywing_desc: "Seguro médico global",
             nordvpn_desc: "Protección de datos",
             download_desktop: "Descargar para Escritorio",
-            win_mac_linux: "Windows, Mac y Linux"
+            win_mac_linux: "Windows, Mac y Linux",
+            auth_error: "Error de autenticación. Revisa tus datos.",
+            login_title: "Accede a tu libertad financiera",
+            signup_title: "Crea tu cuenta de inversor",
+            or_continue: "o continúa con",
+            no_account: "¿No tienes cuenta?",
+            have_account: "¿Ya eres usuario?",
+            register: "Regístrate",
+            login_btn: "Inicia sesión"
         }
     },
     zh: {
