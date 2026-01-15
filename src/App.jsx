@@ -16,7 +16,8 @@ import {
   Globe,
   Download,
   Languages,
-  LogOut
+  LogOut,
+  X
 } from 'lucide-react';
 import {
   AreaChart,
@@ -30,17 +31,17 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from './AuthContext';
+import { db } from './firebase';
+import {
+  collection,
+  addDoc,
+  query,
+  where,
+  onSnapshot,
+  orderBy,
+  serverTimestamp
+} from 'firebase/firestore';
 import Login from './Login';
-
-const data = [
-  { name: 'Lun', earnings: 400 },
-  { name: 'Mar', earnings: 700 },
-  { name: 'Mié', earnings: 600 },
-  { name: 'Jue', earnings: 900 },
-  { name: 'Vie', earnings: 1100 },
-  { name: 'Sáb', earnings: 1500 },
-  { name: 'Dom', earnings: 1300 },
-];
 
 const StatCard = ({ title, value, change, icon: Icon, trend }) => (
   <motion.div
@@ -148,17 +149,86 @@ function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showInstallGuide, setShowInstallGuide] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+
+  // States para Datos Reales
+  const [transactions, setTransactions] = useState([]);
+  const [totalIncome, setTotalIncome] = useState(0);
+  const [totalExpenses, setTotalExpenses] = useState(0);
+  const [newAmount, setNewAmount] = useState('');
+  const [newDesc, setNewDesc] = useState('');
+  const [newType, setNewType] = useState('income');
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     document.documentElement.dir = i18n.language === 'ar' ? 'rtl' : 'ltr';
     document.documentElement.lang = i18n.language;
   }, [i18n.language]);
 
+  // Cargar datos de Firestore en tiempo real
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const q = query(
+      collection(db, "transactions"),
+      where("userId", "==", currentUser.uid),
+      orderBy("createdAt", "desc")
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const dataArr = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setTransactions(dataArr);
+
+      const income = dataArr.filter(t => t.type === 'income').reduce((acc, curr) => acc + Number(curr.amount), 0);
+      const expenses = dataArr.filter(t => t.type === 'expense').reduce((acc, curr) => acc + Number(curr.amount), 0);
+      setTotalIncome(income);
+      setTotalExpenses(expenses);
+    });
+
+    return unsubscribe;
+  }, [currentUser]);
+
   const changeLanguage = (lng) => {
     i18n.changeLanguage(lng);
   };
 
-  // Si no hay usuario, mostrar el Login
+  const handleAddTransaction = async (e) => {
+    e.preventDefault();
+    if (!newAmount || !newDesc) return;
+    setLoading(true);
+
+    try {
+      await addDoc(collection(db, "transactions"), {
+        userId: currentUser.uid,
+        amount: Number(newAmount),
+        description: newDesc,
+        type: newType,
+        createdAt: serverTimestamp()
+      });
+      setIsAddModalOpen(false);
+      setNewAmount('');
+      setNewDesc('');
+    } catch (err) {
+      console.error("Error adding document: ", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Preparar datos para el gráfico
+  const chartData = transactions.slice(0, 7).reverse().map(t => ({
+    name: t.description.substring(0, 5),
+    earnings: t.type === 'income' ? t.amount : -t.amount
+  }));
+
+  const displayChartData = chartData.length > 0 ? chartData : [
+    { name: 'Lun', earnings: 0 },
+    { name: 'Mar', earnings: 0 },
+    { name: 'Mié', earnings: 0 },
+    { name: 'Jue', earnings: 0 },
+    { name: 'Vie', earnings: 0 },
+  ];
+
   if (!currentUser) {
     return <Login />;
   }
@@ -166,7 +236,66 @@ function App() {
   return (
     <div className={`flex min-h-screen bg-[#020617] text-slate-200 flex-col md:flex-row ${i18n.language === 'ar' ? 'font-arabic' : ''}`}>
 
-      {/* Installation Guide Banner */}
+      {/* Add Transaction Modal */}
+      <AnimatePresence>
+        {isAddModalOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/60 backdrop-blur-md"
+              onClick={() => setIsAddModalOpen(false)}
+            />
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
+              className="glass-card w-full max-w-md p-8 relative z-110 border-white/10"
+            >
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-bold text-white">Añadir Operación</h3>
+                <button onClick={() => setIsAddModalOpen(false)} className="p-2 hover:bg-white/5 rounded-lg"><X /></button>
+              </div>
+              <form onSubmit={handleAddTransaction} className="space-y-4">
+                <div className="flex gap-2 p-1 bg-slate-900 rounded-xl mb-4">
+                  <button
+                    type="button" onClick={() => setNewType('income')}
+                    className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${newType === 'income' ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/30' : 'text-slate-500 hover:text-slate-300'}`}
+                  >
+                    INGRESO
+                  </button>
+                  <button
+                    type="button" onClick={() => setNewType('expense')}
+                    className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${newType === 'expense' ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/30' : 'text-slate-500 hover:text-slate-300'}`}
+                  >
+                    GASTO
+                  </button>
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Descripción</label>
+                  <input
+                    type="text" required placeholder="Ej. Cliente Pro, Café..."
+                    className="w-full bg-slate-900 border border-white/5 rounded-xl px-4 py-3 mt-1.5 focus:outline-none focus:border-indigo-500/50"
+                    value={newDesc} onChange={(e) => setNewDesc(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Cantidad (€)</label>
+                  <input
+                    type="number" required placeholder="0.00"
+                    className="w-full bg-slate-900 border border-white/5 rounded-xl px-4 py-3 mt-1.5 focus:outline-none focus:border-indigo-500/50"
+                    value={newAmount} onChange={(e) => setNewAmount(e.target.value)}
+                  />
+                </div>
+                <button
+                  type="submit" disabled={loading}
+                  className={`w-full py-4 rounded-xl font-bold text-white mt-4 transition-all ${newType === 'income' ? 'bg-indigo-600 hover:bg-indigo-500' : 'bg-rose-600 hover:bg-rose-500'}`}
+                >
+                  {loading ? 'Guardando...' : `Guardar ${newType === 'income' ? 'Ingreso' : 'Gasto'}`}
+                </button>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       <AnimatePresence>
         {showInstallGuide && (
           <motion.div
@@ -186,7 +315,6 @@ function App() {
         )}
       </AnimatePresence>
 
-      {/* Mobile Header */}
       <div className="md:hidden flex items-center justify-between p-4 border-b border-white/5 bg-[#020617] sticky top-0 z-50">
         <div className="flex items-center gap-2">
           <Zap className="w-6 h-6 text-indigo-400 fill-indigo-400" />
@@ -203,7 +331,6 @@ function App() {
         </div>
       </div>
 
-      {/* Sidebar (Desktop & Mobile) */}
       <aside className={`
         fixed md:relative top-0 ${i18n.language === 'ar' ? 'right-0' : 'left-0'} bottom-0 z-40
         w-72 border-r border-white/5 p-8 flex flex-col gap-8 bg-[#020617]
@@ -271,7 +398,6 @@ function App() {
         </div>
       </aside>
 
-      {/* Main Content */}
       <main className="flex-1 p-4 md:p-8 overflow-y-auto">
         <header className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-10">
           <div>
@@ -281,6 +407,13 @@ function App() {
             <p className="text-slate-400 mt-1 text-sm md:text-base">{t('growth')}</p>
           </div>
           <div className="flex items-center gap-2 md:gap-4 overflow-x-auto pb-2 md:pb-0">
+            <button
+              onClick={() => setIsAddModalOpen(true)}
+              className="premium-btn flex items-center gap-2 px-6 py-2.5 shrink-0"
+            >
+              <Plus className="w-4 h-4" />
+              <span className="hidden sm:inline">Añadir Operación</span>
+            </button>
             <div className="hidden md:block">
               <LanguageSelector currentLanguage={i18n.language} onChange={changeLanguage} />
             </div>
@@ -301,26 +434,23 @@ function App() {
           </div>
         </header>
 
-        {/* Stats Grid */}
         <div className={`grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6 mb-8`}>
-          <StatCard title={t('monthly_income')} value="4.850,00€" change="12.5%" trend="up" icon={TrendingUp} />
-          <StatCard title={t('tax_savings')} value="1.240,50€" change="8.2%" trend="up" icon={ShieldCheck} />
-          <StatCard title={t('passive_potential')} value="890,00€" change="2.4%" trend="down" icon={Zap} />
+          <StatCard title={t('monthly_income')} value={`${totalIncome.toFixed(2)}€`} change="Real" trend="up" icon={TrendingUp} />
+          <StatCard title={t('tax_savings')} value={`${(totalIncome * 0.2).toFixed(2)}€`} change="Est." trend="up" icon={ShieldCheck} />
+          <StatCard title={t('passive_potential')} value={`${totalExpenses.toFixed(2)}€`} change="Gastos" trend="down" icon={Zap} />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
-          {/* Main Chart */}
           <div className="lg:col-span-2 glass-card p-4 md:p-6">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-lg font-bold text-white">{t('weekly_performance')}</h3>
               <select className="bg-slate-800 border-none text-[10px] md:text-xs rounded-lg px-2 py-1 outline-none text-slate-300">
                 <option>{t('last_7_days')}</option>
-                <option>{t('last_month')}</option>
               </select>
             </div>
             <div className="h-[250px] md:h-[300px] w-full" dir="ltr">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={data}>
+                <AreaChart data={displayChartData}>
                   <defs>
                     <linearGradient id="colorEarnings" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3} />
@@ -339,63 +469,49 @@ function App() {
                     fillOpacity={1}
                     fill="url(#colorEarnings)"
                   />
+                  <XAxis dataKey="name" hide />
+                  <YAxis hide />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
           </div>
 
-          {/* Right Panel - Passive Streams */}
           <div className="glass-card p-4 md:p-6">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-bold text-white">{t('extra_passive')}</h3>
-              <div className="p-1 px-2 rounded-full bg-emerald-500/10 text-emerald-400 text-[10px] font-bold border border-emerald-500/20 shrink-0">
-                {t('ai_suggested')}
-              </div>
+              <h3 className="text-lg font-bold text-white">Últimas Operaciones</h3>
             </div>
-            <div className="flex flex-col gap-2">
-              <AffiliateOffer
-                title="Revolut Business"
-                desc={t('revolut_desc')}
-                commission="50€"
-                logo={Globe}
-                tag="Fintech"
-                perSignupLabel={t('per_signup')}
-              />
-              <AffiliateOffer
-                title="SafetyWing"
-                desc={t('safetywing_desc')}
-                commission="25€"
-                logo={ShieldCheck}
-                tag="Seguros"
-                perSignupLabel={t('per_signup')}
-              />
-              <AffiliateOffer
-                title="NordVPN"
-                desc={t('nordvpn_desc')}
-                commission="15€"
-                logo={ShieldCheck}
-                tag="Oferta"
-                perSignupLabel={t('per_signup')}
-              />
-              <motion.button
-                whileTap={{ scale: 0.98 }}
-                className="w-full mt-4 md:mt-6 premium-btn flex items-center justify-center gap-2 text-sm"
-              >
-                <Plus className="w-4 h-4" />
-                {t('explore_more')}
-              </motion.button>
+            <div className="flex flex-col gap-3 max-h-[350px] overflow-y-auto pr-2">
+              {transactions.length === 0 ? (
+                <p className="text-slate-500 text-xs text-center py-10 italic">No hay datos todavía. ¡Pulsa "+" para empezar!</p>
+              ) : (
+                transactions.map((t, idx) => (
+                  <div key={idx} className="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/5">
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2 rounded-lg ${t.type === 'income' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}`}>
+                        {t.type === 'income' ? <TrendingUp className="w-4 h-4" /> : <ArrowDownRight className="w-4 h-4" />}
+                      </div>
+                      <div>
+                        <p className="text-xs text-white font-bold">{t.description}</p>
+                        <p className="text-[10px] text-slate-500">{t.createdAt?.toDate().toLocaleDateString()}</p>
+                      </div>
+                    </div>
+                    <p className={`text-sm font-bold ${t.type === 'income' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                      {t.type === 'income' ? '+' : '-'}{t.amount}€
+                    </p>
+                  </div>
+                ))
+              )}
             </div>
 
             <div className="mt-6 pt-6 border-t border-white/5">
               <p className="text-[10px] text-slate-500 leading-tight uppercase font-bold tracking-widest text-center">
-                ZenProfit IA v1.2 • Backend Integrated
+                ZenProfit IA v1.3 • Live Database Active
               </p>
             </div>
           </div>
         </div>
       </main>
 
-      {/* Mobile Back Overlay */}
       {isMobileMenuOpen && (
         <div
           className="fixed inset-0 bg-black/60 backdrop-blur-sm z-30 md:hidden"
