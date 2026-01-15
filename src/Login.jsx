@@ -26,11 +26,12 @@ export default function Login() {
             }
         } catch (err) {
             console.error("Auth Error:", err);
-            // Mostrar mensaje amigable basado en el código de error de Firebase si es posible
-            if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
+            if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
                 setError('Email o contraseña incorrectos.');
             } else if (err.code === 'auth/email-already-in-use') {
                 setError('Este email ya está registrado.');
+            } else if (err.code === 'auth/weak-password') {
+                setError('La contraseña debe tener al menos 6 caracteres.');
             } else {
                 setError(t('auth_error') || 'Error al conectar. Verifica tus datos.');
             }
@@ -46,14 +47,14 @@ export default function Login() {
             await loginWithGoogle();
         } catch (err) {
             console.error("Google Auth Error:", err);
-            setError('No se pudo conectar con Google. Asegúrate de que el dominio esté autorizado en Firebase.');
+            setError('Error de Google: ¿Añadiste el dominio en Firebase > Auth > Settings > Authorized domains?');
         } finally {
             setLoading(false);
         }
     }
 
     return (
-        <div className="fixed inset-0 bg-[#020617] flex flex-col items-center justify-center p-4 md:p-6 overflow-y-auto">
+        <div className="fixed inset-0 bg-[#020617] flex flex-col items-center justify-center p-4 md:p-6 overflow-y-auto" style={{ backgroundColor: '#020617' }}>
             {/* Background Aesthetic */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none">
                 <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] bg-indigo-500/10 blur-[120px] rounded-full" />
@@ -66,13 +67,16 @@ export default function Login() {
                 transition={{ duration: 0.5, ease: "easeOut" }}
                 className="relative z-10 w-full max-w-[440px]"
             >
-                <div className="glass-card shadow-2xl shadow-black/50 overflow-hidden border-white/10">
+                <div className="glass-card shadow-2xl shadow-black/50 overflow-hidden border-white/10"
+                    style={{ background: 'rgba(30, 41, 59, 0.7)', backdropFilter: 'blur(16px)', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.1)' }}>
+
                     {/* Header Section */}
                     <div className="p-8 pb-4 text-center">
                         <motion.div
                             initial={{ scale: 0 }}
                             animate={{ scale: 1 }}
                             className="w-20 h-20 mx-auto rounded-3xl bg-gradient-to-br from-indigo-500 to-cyan-500 flex items-center justify-center shadow-xl shadow-indigo-500/30 mb-6"
+                            style={{ background: 'linear-gradient(135deg, #6366f1, #22d3ee)' }}
                         >
                             <Zap className="text-white w-10 h-10 fill-white" />
                         </motion.div>
@@ -92,10 +96,11 @@ export default function Login() {
                                     initial={{ opacity: 0, height: 0 }}
                                     animate={{ opacity: 1, height: 'auto' }}
                                     exit={{ opacity: 0, height: 0 }}
-                                    className="bg-rose-500/10 border border-rose-500/20 text-rose-400 p-4 rounded-2xl text-xs font-bold mb-6 flex items-center gap-3"
+                                    className="bg-rose-500/10 border border-rose-500/20 text-rose-400 p-4 rounded-2xl text-[11px] font-bold mb-6 flex items-center gap-3"
+                                    style={{ backgroundColor: 'rgba(244, 63, 94, 0.1)', border: '1px solid rgba(244, 63, 94, 0.2)', color: '#fb7185' }}
                                 >
                                     <AlertCircle className="w-5 h-5 shrink-0" />
-                                    {error}
+                                    <span>{error}</span>
                                 </motion.div>
                             )}
                         </AnimatePresence>
@@ -104,10 +109,11 @@ export default function Login() {
                             <div className="space-y-1">
                                 <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Email</label>
                                 <div className="relative">
-                                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+                                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500 z-10" />
                                     <input
                                         type="email" required placeholder="tu@email.com"
-                                        className="w-full bg-slate-900/50 border border-white/5 rounded-2xl pl-12 pr-4 py-4 text-sm focus:outline-none focus:border-indigo-500/50 focus:bg-slate-900 transition-all text-white"
+                                        className="w-full bg-slate-900 border border-white/5 rounded-2xl pl-12 pr-4 py-4 text-sm focus:outline-none focus:border-indigo-500/50 transition-all text-white"
+                                        style={{ backgroundColor: '#0f172a', paddingLeft: '3rem', color: 'white' }}
                                         value={email} onChange={(e) => setEmail(e.target.value)}
                                     />
                                 </div>
@@ -119,10 +125,11 @@ export default function Login() {
                                     {isLogin && <button type="button" className="text-[10px] text-indigo-400 font-bold hover:underline">¿Olvidaste la clave?</button>}
                                 </div>
                                 <div className="relative">
-                                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+                                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500 z-10" />
                                     <input
                                         type="password" required placeholder="••••••••"
-                                        className="w-full bg-slate-900/50 border border-white/5 rounded-2xl pl-12 pr-4 py-4 text-sm focus:outline-none focus:border-indigo-500/50 focus:bg-slate-900 transition-all text-white"
+                                        className="w-full bg-slate-900 border border-white/5 rounded-2xl pl-12 pr-4 py-4 text-sm focus:outline-none focus:border-indigo-500/50 transition-all text-white"
+                                        style={{ backgroundColor: '#0f172a', paddingLeft: '3rem', color: 'white' }}
                                         value={password} onChange={(e) => setPassword(e.target.value)}
                                     />
                                 </div>
@@ -131,14 +138,15 @@ export default function Login() {
                             <button
                                 type="submit" disabled={loading}
                                 className="w-full premium-btn py-4 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50 transition-all"
+                                style={{ background: 'linear-gradient(135deg, #6366f1, #818cf8)', boxShadow: '0 4px 14px 0 rgba(99, 102, 241, 0.4)' }}
                             >
                                 {loading ? 'Procesando...' : isLogin ? <><LogIn className="w-5 h-5" /> {t('login_btn')}</> : <><UserPlus className="w-5 h-5" /> {t('register')}</>}
                             </button>
                         </form>
 
-                        <div className="relative my-8 text-center">
+                        <div className="relative my-8 text-center text-slate-500">
                             <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/5"></div></div>
-                            <span className="relative px-4 bg-[#141d2e] text-[10px] text-slate-500 font-black uppercase tracking-[0.2em]">
+                            <span className="relative px-4 bg-[#141d2e] text-[10px] font-black uppercase tracking-[0.2em]" style={{ backgroundColor: '#141d2e' }}>
                                 {t('or_continue')}
                             </span>
                         </div>
@@ -148,7 +156,8 @@ export default function Login() {
                             whileTap={{ scale: 0.98 }}
                             onClick={handleGoogleLogin}
                             type="button"
-                            className="w-full py-4 bg-white text-black font-black text-xs uppercase tracking-widest rounded-2xl flex items-center justify-center gap-3 hover:bg-slate-100 transition-all shadow-xl shadow-white/5"
+                            className="w-full py-4 bg-white text-black font-black text-xs uppercase tracking-widest rounded-2xl flex items-center justify-center gap-3 hover:bg-slate-100 transition-all"
+                            style={{ backgroundColor: 'white', color: 'black' }}
                         >
                             <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5" alt="Google" />
                             Google
@@ -169,7 +178,7 @@ export default function Login() {
                 </div>
 
                 <p className="text-center mt-8 text-[10px] text-slate-600 font-black uppercase tracking-[0.3em]">
-                    ZenProfit AI Engine v2.0
+                    ZenProfit AI Engine v2.1
                 </p>
             </motion.div>
         </div>
