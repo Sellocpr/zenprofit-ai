@@ -126,6 +126,6 @@ export default function Login() {
                     </button>
                 </p>
             </motion.div>
-        </motion.div>
+        </div>
     );
 }
