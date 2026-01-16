@@ -27,16 +27,10 @@ export default function Login() {
         } catch (err) {
             console.error("Auth Error:", err);
             const code = err.code || 'unknown';
-            if (code === 'auth/user-not-found' || code === 'auth/wrong-password' || code === 'auth/invalid-credential') {
-                setError('Email o contraseña incorrectos.');
-            } else if (code === 'auth/email-already-in-use') {
-                setError('Este email ya está registrado.');
-            } else if (code === 'auth/weak-password') {
-                setError('La contraseña debe tener al menos 6 caracteres.');
-            } else if (code === 'auth/operation-not-allowed') {
-                setError('Error (auth/operation-not-allowed): Habilita el método Email/Password en Firebase Console (Authentication > Sign-in method).');
+            if (code === 'auth/operation-not-allowed') {
+                setError('Error: Habilita el método en Firebase Console.');
             } else {
-                setError(`Error (${code}): ${err.message || 'Verifica tus datos.'}`);
+                setError(`Error (${code}): Verifica tus datos.`);
             }
         } finally {
             setLoading(false);
@@ -50,145 +44,88 @@ export default function Login() {
             await loginWithGoogle();
         } catch (err) {
             console.error("Google Auth Error:", err);
-            const code = err.code || 'unknown';
-            if (code === 'auth/operation-not-allowed') {
-                setError('Error (auth/operation-not-allowed): Habilita el método Google en Firebase Console (Authentication > Sign-in method).');
-            } else {
-                setError(`Error de Google (${code}): Verifica la configuración y dominios autorizados.`);
-            }
+            setError(`Error de Google: Verifica la configuración en Firebase.`);
         } finally {
             setLoading(false);
         }
     }
 
     return (
-        <div className="fixed inset-0 bg-[#020617] flex flex-col items-center justify-center p-4 md:p-6 overflow-y-auto" style={{ backgroundColor: '#020617' }}>
+        <div className="fixed inset-0 bg-[#020617] flex items-center justify-center p-6 bg-slate-950 font-inter">
             {/* Background Aesthetic */}
-            <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] bg-indigo-500/10 blur-[120px] rounded-full" />
-                <div className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] bg-cyan-500/10 blur-[120px] rounded-full" />
+            <div className="absolute inset-0 pointer-events-none opacity-40">
+                <div className="absolute top-[-10%] left-[-10%] w-[80%] h-[80%] bg-indigo-500/10 blur-[150px] rounded-full" />
+                <div className="absolute bottom-[-10%] right-[-10%] w-[80%] h-[80%] bg-cyan-500/10 blur-[150px] rounded-full" />
             </div>
 
             <motion.div
-                initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                transition={{ duration: 0.5, ease: "easeOut" }}
-                className="relative z-10 w-full max-w-[440px]"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="relative z-10 w-full max-w-[440px] glass-card p-12 bg-slate-900 border-white/5 shadow-2xl"
             >
-                <div className="glass-card shadow-2xl shadow-black/50 overflow-hidden border-white/10"
-                    style={{ background: 'rgba(30, 41, 59, 0.7)', backdropFilter: 'blur(16px)', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.1)' }}>
-
-                    {/* Header Section */}
-                    <div className="p-8 pb-4 text-center">
-                        <motion.div
-                            initial={{ scale: 0 }}
-                            animate={{ scale: 1 }}
-                            className="w-20 h-20 mx-auto rounded-3xl bg-gradient-to-br from-indigo-500 to-cyan-500 flex items-center justify-center shadow-xl shadow-indigo-500/30 mb-6"
-                            style={{ background: 'linear-gradient(135deg, #6366f1, #22d3ee)' }}
-                        >
-                            <Zap className="text-white w-10 h-10 fill-white" />
-                        </motion.div>
-                        <h1 className="text-3xl font-black text-white italic tracking-tighter mb-2">
-                            ZenProfit <span className="text-indigo-400">AI</span>
-                        </h1>
-                        <p className="text-slate-400 font-medium">
-                            {isLogin ? t('login_title') : t('signup_title')}
-                        </p>
+                <div className="text-center mb-12">
+                    <div className="w-20 h-20 bg-gradient-to-br from-indigo-500 to-cyan-400 rounded-3xl mx-auto flex items-center justify-center shadow-2xl mb-8 border border-white/10 shadow-indigo-500/30">
+                        <Zap className="text-white fill-white w-10 h-10" />
                     </div>
-
-                    <div className="px-8 pb-10">
-                        {/* Error Message */}
-                        <AnimatePresence>
-                            {error && (
-                                <motion.div
-                                    initial={{ opacity: 0, height: 0 }}
-                                    animate={{ opacity: 1, height: 'auto' }}
-                                    exit={{ opacity: 0, height: 0 }}
-                                    className="bg-rose-500/10 border border-rose-500/20 text-rose-400 p-4 rounded-2xl text-[11px] font-bold mb-6 flex items-center gap-3"
-                                    style={{ backgroundColor: 'rgba(244, 63, 94, 0.1)', border: '1px solid rgba(244, 63, 94, 0.2)', color: '#fb7185' }}
-                                >
-                                    <AlertCircle className="w-5 h-5 shrink-0" />
-                                    <span>{error}</span>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-
-                        <form onSubmit={handleSubmit} className="space-y-4">
-                            <div className="space-y-1">
-                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Email</label>
-                                <div className="relative">
-                                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500 z-10" />
-                                    <input
-                                        type="email" required placeholder="tu@email.com"
-                                        className="w-full bg-slate-900 border border-white/5 rounded-2xl pl-12 pr-4 py-4 text-sm focus:outline-none focus:border-indigo-500/50 transition-all text-white"
-                                        style={{ backgroundColor: '#0f172a', paddingLeft: '3rem', color: 'white' }}
-                                        value={email} onChange={(e) => setEmail(e.target.value)}
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="space-y-1">
-                                <div className="flex justify-between items-center ml-1">
-                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Contraseña</label>
-                                    {isLogin && <button type="button" className="text-[10px] text-indigo-400 font-bold hover:underline">¿Olvidaste la clave?</button>}
-                                </div>
-                                <div className="relative">
-                                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500 z-10" />
-                                    <input
-                                        type="password" required placeholder="••••••••"
-                                        className="w-full bg-slate-900 border border-white/5 rounded-2xl pl-12 pr-4 py-4 text-sm focus:outline-none focus:border-indigo-500/50 transition-all text-white"
-                                        style={{ backgroundColor: '#0f172a', paddingLeft: '3rem', color: 'white' }}
-                                        value={password} onChange={(e) => setPassword(e.target.value)}
-                                    />
-                                </div>
-                            </div>
-
-                            <button
-                                type="submit" disabled={loading}
-                                className="w-full premium-btn py-4 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50 transition-all"
-                                style={{ background: 'linear-gradient(135deg, #6366f1, #818cf8)', boxShadow: '0 4px 14px 0 rgba(99, 102, 241, 0.4)' }}
-                            >
-                                {loading ? 'Procesando...' : isLogin ? <><LogIn className="w-5 h-5" /> {t('login_btn')}</> : <><UserPlus className="w-5 h-5" /> {t('register')}</>}
-                            </button>
-                        </form>
-
-                        <div className="relative my-8 text-center text-slate-500">
-                            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/5"></div></div>
-                            <span className="relative px-4 bg-[#141d2e] text-[10px] font-black uppercase tracking-[0.2em]" style={{ backgroundColor: '#141d2e' }}>
-                                {t('or_continue')}
-                            </span>
-                        </div>
-
-                        <motion.button
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
-                            onClick={handleGoogleLogin}
-                            type="button"
-                            className="w-full py-4 bg-white text-black font-black text-xs uppercase tracking-widest rounded-2xl flex items-center justify-center gap-3 hover:bg-slate-100 transition-all"
-                            style={{ backgroundColor: 'white', color: 'black' }}
-                        >
-                            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5" alt="Google" />
-                            Google
-                        </motion.button>
-
-                        <div className="mt-8 text-center">
-                            <p className="text-slate-500 text-xs font-medium">
-                                {isLogin ? t('no_account') : t('have_account')} {' '}
-                                <button
-                                    onClick={() => { setIsLogin(!isLogin); setError(''); }}
-                                    className="text-indigo-400 font-black hover:text-indigo-300 transition-colors uppercase tracking-wider ml-1"
-                                >
-                                    {isLogin ? t('register') : t('login_btn')}
-                                </button>
-                            </p>
-                        </div>
-                    </div>
+                    <h1 className="text-4xl font-black text-white italic tracking-tighter leading-none mb-2">
+                        ZenProfit <span className="text-indigo-400">AI</span>
+                    </h1>
+                    <p className="text-slate-500 font-bold uppercase text-[10px] tracking-[0.4em]">
+                        {isLogin ? 'Secure Access' : 'New Investor'}
+                    </p>
                 </div>
 
-                <p className="text-center mt-8 text-[10px] text-slate-600 font-black uppercase tracking-[0.3em]">
-                    ZenProfit AI Engine v2.1
+                {error && (
+                    <div className="bg-rose-500/5 border border-rose-500/20 text-rose-500 p-4 rounded-xl text-[10px] font-black uppercase mb-8 flex items-center gap-3">
+                        <AlertCircle className="w-5 h-5" />
+                        <span>{error}</span>
+                    </div>
+                )}
+
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <input
+                        type="email" required placeholder="Email"
+                        className="w-full bg-slate-950/60 border border-white/5 rounded-2xl px-6 py-5 text-white font-bold outline-none focus:border-indigo-500/50 transition-all shadow-inner"
+                        value={email} onChange={(e) => setEmail(e.target.value)}
+                    />
+                    <input
+                        type="password" required placeholder="Passcode"
+                        className="w-full bg-slate-950/60 border border-white/5 rounded-2xl px-6 py-5 text-white font-bold outline-none focus:border-indigo-500/50 transition-all shadow-inner"
+                        value={password} onChange={(e) => setPassword(e.target.value)}
+                    />
+                    <button
+                        type="submit" disabled={loading}
+                        className="w-full py-5 bg-indigo-500 text-white font-black uppercase tracking-[0.3em] rounded-2xl hover:bg-indigo-600 transition-all shadow-2xl shadow-indigo-500/30 active:scale-95 italic"
+                    >
+                        {loading ? 'Analizando...' : isLogin ? 'Entrar' : 'Registrar'}
+                    </button>
+                </form>
+
+                <div className="relative my-10 flex items-center">
+                    <div className="flex-1 border-t border-white/5"></div>
+                    <span className="px-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">O entrar con</span>
+                    <div className="flex-1 border-t border-white/5"></div>
+                </div>
+
+                <button
+                    onClick={handleGoogleLogin}
+                    type="button"
+                    className="w-full py-5 bg-white text-black font-black uppercase tracking-[0.2em] rounded-2xl flex items-center justify-center gap-4 hover:bg-slate-100 transition-all text-xs outline-none"
+                >
+                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-6 h-6" alt="Google" />
+                    Google Account
+                </button>
+
+                <p className="text-center mt-10 text-slate-500 text-xs font-medium">
+                    {isLogin ? '¿Nuevo aquí?' : '¿Ya eres miembro?'}
+                    <button
+                        onClick={() => setIsLogin(!isLogin)}
+                        className="text-indigo-400 font-black uppercase tracking-widest ml-2 hover:underline"
+                    >
+                        {isLogin ? 'Registrarse' : 'Login'}
+                    </button>
                 </p>
             </motion.div>
-        </div>
+        </motion.div>
     );
 }
