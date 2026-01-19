@@ -64,15 +64,19 @@ export default function Login() {
                 className="relative z-10 w-full max-w-[440px] glass-card p-12 bg-slate-900 border-white/5 shadow-2xl"
             >
                 <div className="text-center mb-12">
-                    <div className="w-20 h-20 bg-gradient-to-br from-indigo-500 to-cyan-400 rounded-3xl mx-auto flex items-center justify-center shadow-2xl mb-8 border border-white/10 shadow-indigo-500/30">
-                        <Zap className="text-white fill-white w-10 h-10" />
+                    <div className="w-20 h-20 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-[28px] mx-auto flex items-center justify-center shadow-[0_20px_40px_rgba(99,102,241,0.4)] mb-8 border border-white/10 group hover:scale-110 transition-transform">
+                        <Zap className="text-white fill-white w-10 h-10 animate-pulse" />
                     </div>
-                    <h1 className="text-4xl font-black text-white italic tracking-tighter leading-none mb-2">
-                        ZenProfit <span className="text-indigo-400">AI</span>
+                    <h1 className="text-4xl font-black text-white italic tracking-tighter leading-none mb-3">
+                        ZenProfit <span className="text-indigo-400">Elite</span>
                     </h1>
-                    <p className="text-slate-500 font-bold uppercase text-[10px] tracking-[0.4em]">
-                        {isLogin ? 'Secure Access' : 'New Investor'}
+                    <p className="text-slate-500 font-black uppercase text-[9px] tracking-[0.5em] mb-4">
+                        Ultimate Financial Console
                     </p>
+                    <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/5 rounded-full border border-white/5">
+                        <div className="w-1 h-1 rounded-full bg-emerald-400 animate-ping" />
+                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">+12.4k Inversores Activos</span>
+                    </div>
                 </div>
 
                 {error && (

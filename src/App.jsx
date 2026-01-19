@@ -20,27 +20,41 @@ const APP_LOGO = "/assets/logo-premium.png";
 
 // --- Components ---
 
-const MarketTicker = () => (
-  <div className="w-full bg-slate-900/60 backdrop-blur-md border-b border-white/5 py-3 px-10 flex overflow-hidden whitespace-nowrap z-50">
-    <motion.div
-      initial={{ x: "100%" }}
-      animate={{ x: "-100%" }}
-      transition={{ repeat: Infinity, duration: 40, ease: "linear" }}
-      className="flex gap-20 items-center"
-    >
-      {['BTC: $42,102 (-0.4%)', 'ETH: $2,250 (+1.2%)', 'EUR/USD: 1.087', 'GOLD: $2,045', 'S&P 500: 4,780 (+0.3%)'].map((item, i) => (
-        <span key={i} className="text-[10px] font-black text-slate-400 flex items-center gap-2 uppercase">
-          <Activity className="w-3 h-3 text-indigo-400" /> {item}
-        </span>
-      ))}
-      {['BTC: $42,102 (-0.4%)', 'ETH: $2,250 (+1.2%)', 'EUR/USD: 1.087', 'GOLD: $2,045', 'S&P 500: 4,780 (+0.3%)'].map((item, i) => (
-        <span key={i + "-2"} className="text-[10px] font-black text-slate-400 flex items-center gap-2 uppercase">
-          <Activity className="w-3 h-3 text-indigo-400" /> {item}
-        </span>
-      ))}
-    </motion.div>
-  </div>
-);
+const MarketTicker = ({ prices }) => {
+  const tickerItems = useMemo(() => {
+    if (!prices) return ['BTC: Loading...', 'ETH: Loading...', 'EUR/USD: 1.087', 'GOLD: $2,045', 'S&P 500: 4,780'];
+    return [
+      `BTC: $${prices.bitcoin?.usd.toLocaleString() || '---'}`,
+      `ETH: $${prices.ethereum?.usd.toLocaleString() || '---'}`,
+      `SOL: $${prices.solana?.usd.toLocaleString() || '---'}`,
+      `BNB: $${prices.binancecoin?.usd.toLocaleString() || '---'}`,
+      `EUR/USD: 1.087`,
+      `GOLD: $2,045`
+    ];
+  }, [prices]);
+
+  return (
+    <div className="w-full bg-slate-900/60 backdrop-blur-md border-b border-white/5 py-3 px-10 flex overflow-hidden whitespace-nowrap z-50">
+      <motion.div
+        initial={{ x: "100%" }}
+        animate={{ x: "-100%" }}
+        transition={{ repeat: Infinity, duration: 40, ease: "linear" }}
+        className="flex gap-20 items-center"
+      >
+        {tickerItems.map((item, i) => (
+          <span key={i} className="text-[10px] font-black text-slate-400 flex items-center gap-2 uppercase">
+            <Activity className="w-3 h-3 text-indigo-400" /> {item}
+          </span>
+        ))}
+        {tickerItems.map((item, i) => (
+          <span key={i + "-2"} className="text-[10px] font-black text-slate-400 flex items-center gap-2 uppercase">
+            <Activity className="w-3 h-3 text-indigo-400" /> {item}
+          </span>
+        ))}
+      </motion.div>
+    </div>
+  );
+};
 
 const AdBanner = ({ type, onUpgrade, isPremium }) => {
   if (isPremium) return null; // No ads for premium users
@@ -123,6 +137,20 @@ function App() {
   const [newCategory, setNewCategory] = useState('Otros');
   const [loading, setLoading] = useState(false);
   const [currency, setCurrency] = useState('EUR');
+  const [marketPrices, setMarketPrices] = useState(null);
+
+  useEffect(() => {
+    const fetchPrices = async () => {
+      try {
+        const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana,binancecoin&vs_currencies=usd');
+        const data = await res.json();
+        setMarketPrices(data);
+      } catch (err) { console.error("Price fetch failed", err); }
+    };
+    fetchPrices();
+    const interval = setInterval(fetchPrices, 60000 * 5); // 5 min
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     document.documentElement.dir = i18n.language === 'ar' ? 'rtl' : 'ltr';
@@ -147,18 +175,29 @@ function App() {
       setAiThinking(true);
       setTimeout(() => {
         const last = transactions[0];
+        const expenseRatio = totalIncome > 0 ? (totalExpenses / totalIncome) : 0;
+        const highestCategory = transactions.reduce((acc, curr) => {
+          if (curr.type === 'expense') acc[curr.category] = (acc[curr.category] || 0) + curr.amount;
+          return acc;
+        }, {});
+        const topCat = Object.keys(highestCategory).reduce((a, b) => highestCategory[a] > highestCategory[b] ? a : b, 'Otros');
+
         let ins = "";
         if (isPremium) {
-          ins = last.type === 'income'
-            ? "Análisis Pro: Has incrementado tu capital operativo. Sugerencia: Reinvierte el 22% en activos de alta liquidez para maximizar el interés compuesto."
-            : "Alerta Pro: Detectamos un patrón de gasto en " + (last.category || "General") + ". Tu Wealth Score bajaría un 2% si se repite. Optimización sugerida.";
+          if (expenseRatio > 0.7) {
+            ins = `Alerta Pro: Tu ratio de gastos (${(expenseRatio * 100).toFixed(0)}%) es crítico. Reduce gastos en "${topCat}" para asegurar tu meta de 50k.`;
+          } else if (totalIncome > 0) {
+            ins = `Análisis Pro: Estás ahorrando un ${(100 - (expenseRatio * 100)).toFixed(0)}% de tus ingresos. A este ritmo, alcanzarás tu meta en ${Math.ceil((50000 - (totalIncome - totalExpenses)) / (totalIncome - totalExpenses || 1))} períodos.`;
+          } else {
+            ins = "Análisis Pro: Registra ingresos para calcular tu proyección de libertad financiera.";
+          }
         } else {
-          ins = last.type === 'income' ? "¡Gran entrada de capital! ZenProfit recomienda ahorrar para tu libertad financiera." : "Análisis de flujo en curso. Mantén el control de tus gastos para evitar fugas.";
+          ins = expenseRatio > 0.5 ? "Cuidado con los gastos elevados. ZenProfit sugiere revisar la categoría " + topCat + "." : "Tu balance es saludable. Sigue registrando para mejorar el análisis.";
         }
         setAiInsight(ins); setAiThinking(false);
       }, 2500);
     }
-  }, [transactions, isPremium]);
+  }, [transactions, isPremium, totalIncome, totalExpenses]);
 
   const addNotification = (title, type = 'info') => {
     const newNotif = { id: Date.now(), title, type, time: new Date().toLocaleTimeString() };
@@ -177,13 +216,14 @@ function App() {
 
   const handleUpgrade = () => {
     setLoading(true);
+    // Simular procesamiento de pago
     setTimeout(() => {
       setIsPremium(true);
       localStorage.setItem('zenprofit_pro', 'true');
       setLoading(false);
       setIsUpgradeModalOpen(false);
-      addNotification('¡Modo ZenProfit PRO Activado!', 'success');
-    }, 2000);
+      addNotification('¡Bienvenido a la Élite ZenProfit!', 'success');
+    }, 2500);
   };
 
   const filteredTransactions = useMemo(() => {
@@ -319,7 +359,7 @@ function App() {
           <div className="text-center mb-20">
             <div className="inline-block p-4 bg-indigo-500/10 rounded-3xl mb-6 border border-indigo-500/20"><HelpCircle className="w-16 h-16 text-indigo-400 animate-pulse" /></div>
             <h2 className="text-5xl font-black text-white italic tracking-tighter mb-4 uppercase">Manual de Usuario Pro</h2>
-            <p className="text-slate-500 uppercase text-[10px] font-black tracking-[0.6em]">Domina tus Finanzas con ZenProfit v4.0</p>
+            <p className="text-slate-500 uppercase text-[10px] font-black tracking-[0.6em]">Domina tus Finanzas con ZenProfit</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -359,40 +399,64 @@ function App() {
             </div>
           </div>
           <div className="glass-card p-12 bg-indigo-500/5 flex flex-col justify-center border-indigo-500/10 shadow-indigo-500/20 shadow-2xl relative overflow-hidden">
-            <Trophy className="w-20 h-20 text-indigo-400 mb-8 animate-bounce" /><h4 className="text-4xl font-black text-white italic tracking-tighter">Wealth Score</h4><p className="text-8xl font-black text-indigo-400 italic tabular-nums leading-none">82<span className="text-3xl text-slate-600">/100</span></p>
-            <div className="w-full h-4 bg-slate-950 rounded-full mt-12 overflow-hidden border border-white/5"><motion.div initial={{ width: 0 }} animate={{ width: '82%' }} className="h-full bg-indigo-500 shadow-[0_0_30px_rgba(99,102,241,0.6)]" /></div>
-            <div className="mt-10 space-y-4">
-              <div className="flex justify-between text-[10px] font-black uppercase tracking-widest"><span className="text-slate-500">Nivel Actual</span><span className="text-indigo-400 italic">Inversor Estratégico</span></div>
-              <div className="flex justify-between text-[10px] font-black uppercase tracking-widest"><span className="text-slate-500">Próximo Rango</span><span className="text-white italic">Zen Master</span></div>
+            <Trophy className="w-20 h-20 text-indigo-400 mb-8 animate-bounce" />
+            <h4 className="text-4xl font-black text-white italic tracking-tighter">Wealth Score</h4>
+            <p className="text-8xl font-black text-indigo-400 italic tabular-nums leading-none">
+              {Math.min(100, Math.max(0, Math.floor(((totalIncome - totalExpenses) / (totalIncome || 1)) * 100)) || 0)}
+              <span className="text-3xl text-slate-600">/100</span>
+            </p>
+            <div className="w-full h-4 bg-slate-950 rounded-full mt-10 overflow-hidden border border-white/5">
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: `${Math.min(100, Math.max(0, Math.floor(((totalIncome - totalExpenses) / (totalIncome || 1)) * 100)) || 0)}%` }}
+                className="h-full bg-indigo-500 shadow-[0_0_25px_rgba(99,102,241,0.6)]"
+              />
             </div>
+            <p className="text-[10px] text-slate-500 mt-8 uppercase font-black tracking-[0.4em]">Nivel Inversor: {totalIncome > 10000 ? 'Estratégico Elite' : 'Aprendiz Zen'}</p>
           </div>
         </div>
       );
       case 'cards': return (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-10 mb-20 overflow-visible">
-          {[
-            { n: 'Revolut Pro', d: 'Banca sin fronteras para nómadas digitales.', b: '50€ de Regalo', c: 'indigo', link: 'https://revolut.com' },
-            { n: 'SafetyWing', d: 'Seguro médico global para viajeros remotos.', b: '1 Mes Gratis', c: 'emerald', link: 'https://safetywing.com' },
-            { n: 'NordVPN Premium', d: 'Protege tus datos en cualquier red WiFi.', b: '3 Meses Extra', c: 'blue', link: 'https://nordvpn.com' },
-            { n: 'Binance Global', d: 'El exchange líder para crecer tus criptos.', b: '100$ Voucher', c: 'yellow', link: 'https://binance.com' },
-            { n: 'Wise Business', d: 'Pagos internacionales con comisiones mínimas.', b: 'Fee-Free 1k', c: 'green', link: 'https://wise.com' },
-            { n: 'TradingView Pro', d: 'Gráficos avanzados y señales en tiempo real.', b: '30$ Descuento', c: 'cyan', link: 'https://tradingview.com' }
-          ].map(o => (
-            <div key={o.n} className="glass-card p-12 bg-slate-900/60 border-white/5 group hover:border-indigo-500/40 transition-all shadow-2xl flex flex-col justify-between min-h-[350px] overflow-visible">
-              <div className="overflow-visible">
-                <div className="flex justify-between items-start mb-8 overflow-visible">
-                  <div className={`w-16 h-16 bg-${o.c}-500/20 rounded-2xl flex items-center justify-center text-${o.c}-400`}><CreditCard className="w-8 h-8" /></div>
-                  <span className="text-[9px] font-black bg-white/5 text-slate-400 px-3 py-1.5 rounded-full uppercase tracking-widest border border-white/5 italic">Sponsor</span>
-                </div>
-                <h4 className="text-3xl font-black text-white italic mb-4 tracking-tighter uppercase">{o.n}</h4>
-                <p className="text-sm text-slate-500 font-bold mb-10 leading-relaxed italic">{o.d}</p>
-              </div>
-              <div className="flex justify-between items-center border-t border-white/10 pt-10">
-                <div><p className="text-[10px] text-slate-600 font-black uppercase tracking-widest mb-1">Benefit</p><p className="text-2xl font-black text-indigo-400 tracking-tighter">{o.b}</p></div>
-                <a href={o.link} target="_blank" rel="noopener noreferrer" className="w-16 h-16 bg-white text-black rounded-full flex items-center justify-center hover:scale-110 active:scale-90 transition-all shadow-[0_0_20px_rgba(255,255,255,0.2)]"><ExternalLink className="w-6 h-6" /></a>
-              </div>
+        <div className="space-y-16">
+          <div className="glass-card p-12 bg-gradient-to-br from-indigo-500/10 to-purple-600/10 border-indigo-500/30 flex flex-col lg:flex-row items-center justify-between gap-10">
+            <div className="max-w-[600px] text-center lg:text-left">
+              <div className="inline-flex items-center gap-3 px-4 py-2 bg-indigo-500/20 rounded-full border border-indigo-500/20 mb-6 font-black text-[9px] text-indigo-400 uppercase tracking-widest animate-pulse">Referral Program</div>
+              <h3 className="text-4xl font-black text-white italic tracking-tighter uppercase mb-4">Invita a 3 amigos y gana <span className="text-indigo-400">Pro Lifetime</span></h3>
+              <p className="text-slate-400 text-sm font-bold leading-relaxed italic">Comparte ZenProfit con otros inversores y desbloquea todas las funciones premium de forma gratuita para siempre.</p>
             </div>
-          ))}
+            <div className="flex flex-col sm:flex-row gap-6 w-full lg:w-auto">
+              <div className="bg-slate-950/60 p-6 rounded-3xl border border-white/5 flex items-center gap-6 flex-1 lg:min-w-[300px]">
+                <code className="text-indigo-400 font-black tracking-widest text-sm uppercase">ZEN-{currentUser?.uid?.substring(0, 8).toUpperCase()}</code>
+              </div>
+              <button className="px-10 py-6 bg-white text-indigo-600 font-black uppercase tracking-widest rounded-2xl hover:scale-105 active:scale-95 transition-all shadow-2xl">Copiar Link</button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-10 mb-20 overflow-visible">
+            {[
+              { n: 'Revolut Pro', d: 'Banca sin fronteras para nómadas digitales.', b: '50€ de Regalo', c: 'indigo', link: 'https://revolut.com' },
+              { n: 'SafetyWing', d: 'Seguro médico global para viajeros remotos.', b: '1 Mes Gratis', c: 'emerald', link: 'https://safetywing.com' },
+              { n: 'NordVPN Premium', d: 'Protege tus datos en cualquier red WiFi.', b: '3 Meses Extra', c: 'blue', link: 'https://nordvpn.com' },
+              { n: 'Binance Global', d: 'El exchange líder para crecer tus criptos.', b: '100$ Voucher', c: 'yellow', link: 'https://binance.com' },
+              { n: 'Wise Business', d: 'Pagos internacionales con comisiones mínimas.', b: 'Fee-Free 1k', c: 'green', link: 'https://wise.com' },
+              { n: 'TradingView Pro', d: 'Gráficos avanzados y señales en tiempo real.', b: '30$ Descuento', c: 'cyan', link: 'https://tradingview.com' }
+            ].map(o => (
+              <div key={o.n} className="glass-card p-12 bg-slate-900/60 border-white/5 group hover:border-indigo-500/40 transition-all shadow-2xl flex flex-col justify-between min-h-[350px] overflow-visible">
+                <div className="overflow-visible">
+                  <div className="flex justify-between items-start mb-8 overflow-visible">
+                    <div className={`w-16 h-16 bg-${o.c}-500/20 rounded-2xl flex items-center justify-center text-${o.c}-400`}><CreditCard className="w-8 h-8" /></div>
+                    <span className="text-[9px] font-black bg-white/5 text-slate-400 px-3 py-1.5 rounded-full uppercase tracking-widest border border-white/5 italic">Sponsor</span>
+                  </div>
+                  <h4 className="text-3xl font-black text-white italic mb-4 tracking-tighter uppercase">{o.n}</h4>
+                  <p className="text-sm text-slate-500 font-bold mb-10 leading-relaxed italic">{o.d}</p>
+                </div>
+                <div className="flex justify-between items-center border-t border-white/10 pt-10">
+                  <div><p className="text-[10px] text-slate-600 font-black uppercase tracking-widest mb-1">Benefit</p><p className="text-2xl font-black text-indigo-400 tracking-tighter">{o.b}</p></div>
+                  <a href={o.link} target="_blank" rel="noopener noreferrer" className="w-16 h-16 bg-white text-black rounded-full flex items-center justify-center hover:scale-110 active:scale-90 transition-all shadow-[0_0_20px_rgba(255,255,255,0.2)]"><ExternalLink className="w-6 h-6" /></a>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       );
       default: return null;
@@ -415,7 +479,7 @@ function App() {
           </div>
           <div>
             <h1 className="text-2xl font-black text-white italic tracking-tighter leading-none">ZenProfit</h1>
-            <span className="text-[9px] font-black text-indigo-400 uppercase tracking-[0.5em] mt-1 block">Edition v4.0</span>
+            <span className="text-[9px] font-black text-indigo-400 uppercase tracking-[0.5em] mt-1 block">Ultimate Edition</span>
           </div>
         </div>
 
@@ -440,7 +504,7 @@ function App() {
 
       {/* Main Content View */}
       <main className="flex-1 flex flex-col h-screen overflow-hidden relative z-10 w-full">
-        <MarketTicker />
+        <MarketTicker prices={marketPrices} />
         <header className="px-10 py-10 flex justify-between items-center bg-slate-950/40 backdrop-blur-2xl border-b border-white/5 relative z-[150]">
           <div className="md:hidden font-black text-3xl italic text-white flex items-center gap-4" onClick={() => setIsMobileMenuOpen(true)}>ZenProfit <Activity className="w-6 h-6 text-indigo-400" /></div>
 
@@ -527,23 +591,47 @@ function App() {
         )}
 
         {isUpgradeModalOpen && (
-          <div className="fixed inset-0 z-[2000] flex items-center justify-center p-6 bg-slate-950/90 backdrop-blur-3xl" onClick={() => setIsUpgradeModalOpen(false)}>
-            <motion.div initial={{ y: 200, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 200, opacity: 0 }} className="glass-card w-full max-w-2xl p-16 bg-slate-900 border-indigo-500/40 relative shadow-[0_0_100px_rgba(99,102,241,0.3)] text-center" onClick={e => e.stopPropagation()}>
-              <div className="w-24 h-24 bg-indigo-500/20 rounded-full flex items-center justify-center mx-auto mb-10 border border-indigo-500/30"><Crown className="w-12 h-12 text-indigo-400 animate-pulse" /></div>
-              <h3 className="text-5xl font-black text-white italic tracking-tighter mb-6 uppercase">ZenProfit PRO</h3>
-              <p className="text-slate-400 font-bold mb-12 leading-relaxed italic">Únete a la élite financiera. AI Coach Avanzado, Soporte 24/7 y Experiencia sin Anuncios de por vida.</p>
-
-              <div className="space-y-6 mb-16 px-10">
-                {['Sin publicidad de ningún tipo', 'Coach IA con estrategias de inversión', 'Modo Nómada Pro (Todas las divisas)', 'Prioridad absoluta en servidores'].map((f, ix) => (
-                  <div key={ix} className="flex items-center gap-4 text-left"><div className="w-6 h-6 bg-emerald-500/20 rounded-full flex items-center justify-center shrink-0"><Check className="w-3 h-3 text-emerald-400" /></div><p className="text-xs font-black uppercase text-white/80">{f}</p></div>
-                ))}
+          <div className="fixed inset-0 z-[2000] flex items-center justify-center p-6 bg-slate-950/95 backdrop-blur-3xl" onClick={() => setIsUpgradeModalOpen(false)}>
+            <motion.div initial={{ y: 200, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 200, opacity: 0 }} className="glass-card w-full max-w-2xl p-0 bg-slate-900 border-indigo-500/20 relative shadow-[0_0_100px_rgba(99,102,241,0.2)] overflow-hidden" onClick={e => e.stopPropagation()}>
+              <div className="bg-gradient-to-r from-indigo-600 to-purple-700 p-12 text-center relative overflow-hidden">
+                <Crown className="w-16 h-16 text-white/20 absolute -top-4 -right-4 rotate-12" />
+                <h3 className="text-4xl font-black text-white italic tracking-tighter uppercase mb-2">Checkout Seguro</h3>
+                <p className="text-indigo-100/70 text-xs font-black uppercase tracking-widest">Activa tu Acceso Ultimate de por vida</p>
               </div>
 
-              <div className="flex flex-col gap-6">
-                <button onClick={handleUpgrade} disabled={loading} className="w-full py-8 bg-white text-black font-black uppercase tracking-[0.4em] rounded-[35px] hover:scale-105 active:scale-95 transition-all shadow-2xl italic">
-                  {loading ? 'Procesando Pago Seguro...' : 'Activar Pro LifeTime - 49€'}
-                </button>
-                <button onClick={() => setIsUpgradeModalOpen(false)} className="text-[10px] font-black text-slate-600 uppercase tracking-widest hover:text-white transition-all">Quizás más tarde</button>
+              <div className="p-12 space-y-10">
+                <div className="flex justify-between items-center p-6 bg-slate-950/40 rounded-3xl border border-white/5">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-indigo-500/10 rounded-xl flex items-center justify-center"><Sparkles className="w-6 h-6 text-indigo-400" /></div>
+                    <div><p className="text-xs font-black text-white uppercase italic">ZenProfit Pro Life</p><p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Pago Único • Sin Renovación</p></div>
+                  </div>
+                  <p className="text-2xl font-black text-white italic">49€</p>
+                </div>
+
+                <div className="space-y-6">
+                  <div className="relative group">
+                    <CreditCard className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500 group-focus-within:text-indigo-400 transition-all" />
+                    <input type="text" placeholder="Número de Tarjeta" className="w-full bg-slate-950/40 border border-white/10 rounded-2xl pl-16 pr-8 py-5 text-white font-bold text-sm outline-none focus:border-indigo-500 transition-all placeholder:text-slate-700" defaultValue="4242 4242 4242 4242" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-6">
+                    <input type="text" placeholder="MM/YY" className="bg-slate-950/40 border border-white/10 rounded-2xl px-8 py-5 text-white font-bold text-sm outline-none focus:border-indigo-500 transition-all placeholder:text-slate-700" defaultValue="12/28" />
+                    <input type="text" placeholder="CVC" className="bg-slate-950/40 border border-white/10 rounded-2xl px-8 py-5 text-white font-bold text-sm outline-none focus:border-indigo-500 transition-all placeholder:text-slate-700" defaultValue="123" />
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-6">
+                  <button onClick={handleUpgrade} disabled={loading} className="w-full py-7 bg-indigo-500 text-white font-black uppercase tracking-[0.4em] rounded-[30px] hover:scale-[1.02] active:scale-95 transition-all shadow-2xl shadow-indigo-500/30 flex items-center justify-center gap-4 italic overflow-hidden relative">
+                    {loading ? (
+                      <div className="flex items-center gap-3"><Activity className="w-5 h-5 animate-spin" /> Verificando...</div>
+                    ) : (
+                      <>Pagar Ahora <ChevronRight className="w-5 h-5" /></>
+                    )}
+                  </button>
+                  <div className="flex items-center justify-center gap-3 opacity-30">
+                    <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                    <p className="text-[8px] font-black text-white uppercase tracking-widest">Procesado de Forma Segura • Datos Encriptados</p>
+                  </div>
+                </div>
               </div>
             </motion.div>
           </div>
