@@ -1,0 +1,12 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Regla para la colección de transacciones
+    match /transactions/{transactionId} {
+      // Solo el dueño de la transacción puede leer, escribir o borrar sus datos
+      allow read, write, delete: if request.auth != null && request.auth.uid == resource.data.userId;
+      // Permitir creación solo si el userId coincide con el del usuario autenticado
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+    }
+  }
+}
